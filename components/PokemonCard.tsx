@@ -18,7 +18,7 @@ export default function PokemonCard({ name, url, onPress }: PokemonCardProps) {
       <View className="items-center">
         <Image
           source={{
-            uri: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`,
+            uri: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${id}.gif`,
           }}
           className="w-20 h-20"
         />

@@ -14,6 +14,7 @@ import TypeBadge from "../components/TypeBadge";
 import PokedexHeader from "../components/PokedexHeader";
 import SearchBar from "../components/SearchBar";
 import PokeSound from "../components/PokeSound";
+import FavoriteButton from "../components/FavoriteButton";
 
 type Pokemon = {
   id: number;
@@ -204,7 +205,7 @@ export default function SearchScreen() {
                     {pokemon.sprites?.front_default ? (
                       <Image
                         source={{ 
-                          uri: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${pokemon.id}.gif`
+                          uri: pokemon.sprites.front_default
                         }}
                         className="w-40 h-40"
                       />

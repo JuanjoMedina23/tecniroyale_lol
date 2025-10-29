@@ -90,7 +90,9 @@ export default function SearchScreen() {
         setPokemon({
           id: data.id,
           name: data.name,
-          sprites: data.sprites,
+          sprites: {
+            front_default: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${data.id}.gif`
+          },
           types: data.types,
         });
       }
@@ -201,7 +203,9 @@ export default function SearchScreen() {
                     </Text>
                     {pokemon.sprites?.front_default ? (
                       <Image
-                        source={{ uri: pokemon.sprites.front_default }}
+                        source={{ 
+                          uri: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${pokemon.id}.gif`
+                        }}
                         className="w-40 h-40"
                       />
                     ) : (

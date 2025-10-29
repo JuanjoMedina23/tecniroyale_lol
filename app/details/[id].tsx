@@ -75,7 +75,14 @@ export default function DetailsScreen() {
       const data = await res.json();
 
       if (mountedRef.current) {
-        setPokemon(data);
+        setPokemon({
+          ...data,
+          sprites: {
+            front_default: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${data.id}.gif`,
+            back_default: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/back/${data.id}.gif`,
+            front_shiny: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/shiny/${data.id}.gif`,
+          }
+        });
 
         // Fetch species data for description
         try {
@@ -164,18 +171,13 @@ export default function DetailsScreen() {
             <Text className="text-white text-sm mb-2 opacity-90">
               #{pokemon.id.toString().padStart(3, "0")}
             </Text>
-            {pokemon.sprites?.other?.["official-artwork"]?.front_default ? (
+            {pokemon.sprites?.front_default ? (
               <Image
                 source={{
-                  uri: pokemon.sprites.other["official-artwork"].front_default,
+                  uri: pokemon.sprites.front_default,
                 }}
                 className="w-56 h-56"
                 resizeMode="contain"
-              />
-            ) : pokemon.sprites?.front_default ? (
-              <Image
-                source={{ uri: pokemon.sprites.front_default }}
-                className="w-56 h-56"
               />
             ) : (
               <View className="w-56 h-56 bg-red-700 items-center justify-center rounded-xl">
@@ -192,11 +194,14 @@ export default function DetailsScreen() {
         <View className="px-4 -mt-4">
           {/* Tipos */}
           <View className="bg-white rounded-2xl p-4 mb-4 shadow-lg">
-            <View className="flex-row justify-center">
+            <View className="flex-row justify-center mb-3">
               {pokemon.types?.map((t, i) => (
                 <TypeBadge key={i} type={t.type.name} size="lg" />
               ))}
             </View>
+            
+            {/* Botón de sonido */}
+            <PokeSound pokemonId={pokemon.id} pokemonName={pokemon.name} />
           </View>
 
           {/* Descripción */}
@@ -275,24 +280,27 @@ export default function DetailsScreen() {
             ))}
           </InfoCard>
 
-          {/* Sprites adicionales */}
           <InfoCard title="Variaciones" icon="🎨">
             <View className="flex-row justify-around">
               {pokemon.sprites?.front_default && (
                 <View className="items-center bg-neutral-50 p-3 rounded-xl">
                   <Image
-                    source={{ uri: pokemon.sprites.front_default }}
+                    source={{ 
+                      uri: pokemon.sprites.front_default
+                    }}
                     className="w-24 h-24"
                   />
                   <Text className="text-sm text-neutral-600 mt-2 font-semibold">
-                    Normal
+                    Frente
                   </Text>
                 </View>
               )}
               {pokemon.sprites?.back_default && (
                 <View className="items-center bg-neutral-50 p-3 rounded-xl">
                   <Image
-                    source={{ uri: pokemon.sprites.back_default }}
+                    source={{ 
+                      uri: pokemon.sprites.back_default
+                    }}
                     className="w-24 h-24"
                   />
                   <Text className="text-sm text-neutral-600 mt-2 font-semibold">
@@ -303,7 +311,9 @@ export default function DetailsScreen() {
               {pokemon.sprites?.front_shiny && (
                 <View className="items-center bg-yellow-50 p-3 rounded-xl">
                   <Image
-                    source={{ uri: pokemon.sprites.front_shiny }}
+                    source={{ 
+                      uri: pokemon.sprites.front_shiny
+                    }}
                     className="w-24 h-24"
                   />
                   <Text className="text-sm text-yellow-700 mt-2 font-semibold">

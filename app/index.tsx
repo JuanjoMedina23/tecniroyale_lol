@@ -13,6 +13,7 @@ import PokemonCard from "../components/PokemonCard";
 import TypeBadge from "../components/TypeBadge";
 import PokedexHeader from "../components/PokedexHeader";
 import SearchBar from "../components/SearchBar";
+import PokeSound from "../components/PokeSound";
 
 type Pokemon = {
   id: number;
@@ -217,6 +218,11 @@ export default function SearchScreen() {
                     {pokemon.types?.map((t, i) => (
                       <TypeBadge key={i} type={t.type.name} size="md" />
                     ))}
+                  </View>
+
+                  {/* Botón de sonido */}
+                  <View className="mb-4">
+                    <PokeSound pokemonId={pokemon.id} pokemonName={pokemon.name} />
                   </View>
 
                   <Link href={`/details/${pokemon.id}` as any} asChild>

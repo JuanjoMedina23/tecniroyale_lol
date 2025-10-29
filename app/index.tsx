@@ -3,14 +3,16 @@ import {
   SafeAreaView,
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   Image,
   ActivityIndicator,
   FlatList,
-  Dimensions,
 } from "react-native";
 import { Link } from "expo-router";
+import PokemonCard from "../components/PokemonCard";
+import TypeBadge from "../components/TypeBadge";
+import PokedexHeader from "../components/PokedexHeader";
+import SearchBar from "../components/SearchBar";
 
 type Pokemon = {
   id: number;
@@ -102,87 +104,17 @@ export default function SearchScreen() {
     }
   }
 
-  const getTypeColor = (type: string) => {
-    const colors: { [key: string]: string } = {
-      fire: "bg-orange-500",
-      water: "bg-blue-500",
-      grass: "bg-green-500",
-      electric: "bg-yellow-400",
-      psychic: "bg-pink-500",
-      ice: "bg-cyan-400",
-      dragon: "bg-indigo-600",
-      dark: "bg-gray-800",
-      fairy: "bg-pink-300",
-      normal: "bg-gray-400",
-      fighting: "bg-red-600",
-      flying: "bg-indigo-400",
-      poison: "bg-purple-500",
-      ground: "bg-yellow-600",
-      rock: "bg-yellow-800",
-      bug: "bg-green-600",
-      ghost: "bg-purple-700",
-      steel: "bg-gray-500",
-    };
-    return colors[type] || "bg-gray-400";
-  };
-
-  const PokemonCard = ({ item }: { item: PokemonListItem }) => {
-    const id = item.url.split("/").filter(Boolean).pop();
-    return (
-      <TouchableOpacity
-        onPress={() => fetchPokemon(item.name)}
-        className="w-[48%] bg-white rounded-xl p-3 mb-3 shadow-sm"
-      >
-        <View className="items-center">
-          <Image
-            source={{
-              uri: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`,
-            }}
-            className="w-20 h-20"
-          />
-          <Text className="text-xs text-neutral-400 mt-1">#{id?.padStart(3, "0")}</Text>
-          <Text className="text-base font-semibold capitalize text-center">
-            {item.name}
-          </Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
   return (
     <SafeAreaView className="flex-1 bg-red-600">
       {/* Header Pokédex Style */}
       <View className="bg-red-600 p-6 pb-4">
-        <View className="flex-row items-center mb-4">
-          <View className="w-16 h-16 bg-white rounded-full items-center justify-center mr-3 shadow-lg">
-            <View className="w-12 h-12 bg-blue-400 rounded-full border-4 border-blue-600" />
-          </View>
-          <View>
-            <Text className="text-3xl font-bold text-white">Pokédex</Text>
-            <Text className="text-white text-sm opacity-90">
-              Primera Generación
-            </Text>
-          </View>
-        </View>
+        <PokedexHeader />
 
-        <View className="flex-row items-center space-x-2">
-          <View className="flex-1 bg-white rounded-xl shadow-md overflow-hidden">
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Buscar Pokémon..."
-              className="px-4 py-3 text-base"
-              onSubmitEditing={() => query && fetchPokemon(query)}
-              returnKeyType="search"
-            />
-          </View>
-          <TouchableOpacity
-            className="bg-yellow-400 p-3 rounded-xl shadow-md"
-            onPress={() => query && fetchPokemon(query)}
-          >
-            <Text className="text-2xl">🔍</Text>
-          </TouchableOpacity>
-        </View>
+        <SearchBar
+          value={query}
+          onChangeText={setQuery}
+          onSubmit={() => query && fetchPokemon(query)}
+        />
 
         <View className="flex-row mt-3 space-x-2">
           <TouchableOpacity
@@ -224,7 +156,13 @@ export default function SearchScreen() {
         {searchMode === "browse" ? (
           <FlatList
             data={displayList}
-            renderItem={({ item }) => <PokemonCard item={item} />}
+            renderItem={({ item }) => (
+              <PokemonCard
+                name={item.name}
+                url={item.url}
+                onPress={() => fetchPokemon(item.name)}
+              />
+            )}
             keyExtractor={(item) => item.name}
             numColumns={2}
             columnWrapperStyle={{ justifyContent: "space-between", paddingHorizontal: 12 }}
@@ -276,26 +214,13 @@ export default function SearchScreen() {
                   </View>
 
                   <View className="flex-row justify-center mb-6">
-                    {pokemon.types?.map((t, i) => {
-                      const typeColor = getTypeColor(t.type.name);
-                      return (
-                        <View
-                          key={i}
-                          className={`${typeColor} px-6 py-2 rounded-full mr-2`}
-                        >
-                          <Text className="text-white font-bold capitalize text-base">
-                            {t.type.name}
-                          </Text>
-                        </View>
-                      );
-                    })}
+                    {pokemon.types?.map((t, i) => (
+                      <TypeBadge key={i} type={t.type.name} size="md" />
+                    ))}
                   </View>
 
-                  <Link
-                    href={`/details/${pokemon.id}` as any}
-                    asChild
-                  >
-                    <TouchableOpacity className="bg-gradient-to-r bg-red-600 py-4 rounded-xl shadow-md">
+                  <Link href={`/details/${pokemon.id}` as any} asChild>
+                    <TouchableOpacity className="bg-red-600 py-4 rounded-xl shadow-md">
                       <Text className="text-white font-bold text-center text-lg">
                         Ver Información Completa →
                       </Text>

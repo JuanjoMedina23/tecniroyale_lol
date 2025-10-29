@@ -112,7 +112,15 @@ export default function SearchScreen() {
     <SafeAreaView className="flex-1 bg-red-600">
       {/* Header Pokédex Style */}
       <View className="bg-red-600 p-6 pb-4">
-        <PokedexHeader />
+        <View className="flex-row justify-between items-start mb-4">
+          <PokedexHeader />
+          
+          <Link href="/favorites" asChild>
+            <TouchableOpacity className="bg-white px-4 py-2 rounded-lg shadow-md">
+              <Text className="text-2xl">❤️</Text>
+            </TouchableOpacity>
+          </Link>
+        </View>
 
         <SearchBar
           value={query}
@@ -228,6 +236,18 @@ export default function SearchScreen() {
                   {/* Botón de sonido */}
                   <View className="mb-4">
                     <PokeSound pokemonId={pokemon.id} pokemonName={pokemon.name} />
+                  </View>
+
+                  {/* Botón de favoritos */}
+                  <View className="mb-4">
+                    <FavoriteButton
+                      pokemon={{
+                        id: pokemon.id,
+                        name: pokemon.name,
+                        imageUrl: pokemon.sprites?.front_default || "",
+                        types: pokemon.types?.map(t => t.type.name) || [],
+                      }}
+                    />
                   </View>
 
                   <Link href={`/details/${pokemon.id}` as any} asChild>

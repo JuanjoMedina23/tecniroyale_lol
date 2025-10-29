@@ -1,5 +1,6 @@
 import React from "react";
-import { View, Text, Image, TouchableOpacity } from "react-native";
+import { View, Text, TouchableOpacity } from "react-native";
+import PokemonImage from "./PokemonImage";
 
 type PokemonCardProps = {
   name: string;
@@ -16,12 +17,7 @@ export default function PokemonCard({ name, url, onPress }: PokemonCardProps) {
       className="w-[48%] bg-white rounded-xl p-3 mb-3 shadow-sm"
     >
       <View className="items-center">
-        <Image
-          source={{
-            uri: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${id}.gif`,
-          }}
-          className="w-20 h-20"
-        />
+        <PokemonImage pokemonId={Number(id)} size={80} />
         <Text className="text-xs text-neutral-400 mt-1">
           #{id?.padStart(3, "0")}
         </Text>

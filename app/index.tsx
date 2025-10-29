@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
+  FlatList,
+  Dimensions,
 } from "react-native";
 import { Link } from "expo-router";
 
@@ -17,21 +19,51 @@ type Pokemon = {
   types?: { type: { name: string } }[];
 };
 
+type PokemonListItem = {
+  name: string;
+  url: string;
+};
+
 export default function SearchScreen() {
   const [query, setQuery] = useState("");
   const [pokemon, setPokemon] = useState<Pokemon | null>(null);
+  const [pokemonList, setPokemonList] = useState<PokemonListItem[]>([]);
+  const [displayList, setDisplayList] = useState<PokemonListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchMode, setSearchMode] = useState<"search" | "browse">("browse");
   const mountedRef = useRef(true);
 
   useEffect(() => {
-    // Puedes precargar un Pokémon por defecto si quieres
-    // fetchPokemon("pikachu");
-
+    fetchPokemonList();
     return () => {
       mountedRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (query.trim()) {
+      const filtered = pokemonList.filter((p) =>
+        p.name.toLowerCase().includes(query.toLowerCase())
+      );
+      setDisplayList(filtered.slice(0, 20));
+    } else {
+      setDisplayList(pokemonList.slice(0, 20));
+    }
+  }, [query, pokemonList]);
+
+  async function fetchPokemonList() {
+    try {
+      const res = await fetch("https://pokeapi.co/api/v2/pokemon?limit=151");
+      const data = await res.json();
+      if (mountedRef.current) {
+        setPokemonList(data.results);
+        setDisplayList(data.results.slice(0, 20));
+      }
+    } catch (err) {
+      console.error("Error fetching list:", err);
+    }
+  }
 
   async function fetchPokemon(nameOrId: string) {
     const q = nameOrId.trim().toLowerCase();
@@ -40,6 +72,7 @@ export default function SearchScreen() {
     setLoading(true);
     setError(null);
     setPokemon(null);
+    setSearchMode("search");
 
     const url = `https://pokeapi.co/api/v2/pokemon/${encodeURIComponent(q)}`;
 
@@ -49,8 +82,7 @@ export default function SearchScreen() {
         throw new Error("Pokémon no encontrado");
       }
       const data = await res.json();
-      
-      // Solo actualizar estado si el componente está montado
+
       if (mountedRef.current) {
         setPokemon({
           id: data.id,
@@ -70,82 +102,251 @@ export default function SearchScreen() {
     }
   }
 
+  const getTypeColor = (type: string) => {
+    const colors: { [key: string]: string } = {
+      fire: "bg-orange-500",
+      water: "bg-blue-500",
+      grass: "bg-green-500",
+      electric: "bg-yellow-400",
+      psychic: "bg-pink-500",
+      ice: "bg-cyan-400",
+      dragon: "bg-indigo-600",
+      dark: "bg-gray-800",
+      fairy: "bg-pink-300",
+      normal: "bg-gray-400",
+      fighting: "bg-red-600",
+      flying: "bg-indigo-400",
+      poison: "bg-purple-500",
+      ground: "bg-yellow-600",
+      rock: "bg-yellow-800",
+      bug: "bg-green-600",
+      ghost: "bg-purple-700",
+      steel: "bg-gray-500",
+    };
+    return colors[type] || "bg-gray-400";
+  };
+
+  const PokemonCard = ({ item }: { item: PokemonListItem }) => {
+    const id = item.url.split("/").filter(Boolean).pop();
+    return (
+      <TouchableOpacity
+        onPress={() => fetchPokemon(item.name)}
+        className="w-[48%] bg-white rounded-xl p-3 mb-3 shadow-sm"
+      >
+        <View className="items-center">
+          <Image
+            source={{
+              uri: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`,
+            }}
+            className="w-20 h-20"
+          />
+          <Text className="text-xs text-neutral-400 mt-1">#{id?.padStart(3, "0")}</Text>
+          <Text className="text-base font-semibold capitalize text-center">
+            {item.name}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
-    <SafeAreaView className="flex-1 bg-neutral-50 p-4">
-      <View className="mb-4">
-        <Text className="text-2xl font-bold mb-2">Buscador de Pokémon</Text>
-        <Text className="text-sm text-neutral-600">
-          Busca por nombre o id (ej: pikachu o 25)
-        </Text>
+    <SafeAreaView className="flex-1 bg-red-600">
+      {/* Header Pokédex Style */}
+      <View className="bg-red-600 p-6 pb-4">
+        <View className="flex-row items-center mb-4">
+          <View className="w-16 h-16 bg-white rounded-full items-center justify-center mr-3 shadow-lg">
+            <View className="w-12 h-12 bg-blue-400 rounded-full border-4 border-blue-600" />
+          </View>
+          <View>
+            <Text className="text-3xl font-bold text-white">Pokédex</Text>
+            <Text className="text-white text-sm opacity-90">
+              Primera Generación
+            </Text>
+          </View>
+        </View>
+
+        <View className="flex-row items-center space-x-2">
+          <View className="flex-1 bg-white rounded-xl shadow-md overflow-hidden">
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Buscar Pokémon..."
+              className="px-4 py-3 text-base"
+              onSubmitEditing={() => query && fetchPokemon(query)}
+              returnKeyType="search"
+            />
+          </View>
+          <TouchableOpacity
+            className="bg-yellow-400 p-3 rounded-xl shadow-md"
+            onPress={() => query && fetchPokemon(query)}
+          >
+            <Text className="text-2xl">🔍</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View className="flex-row mt-3 space-x-2">
+          <TouchableOpacity
+            onPress={() => setSearchMode("browse")}
+            className={`flex-1 py-2 rounded-lg ${
+              searchMode === "browse" ? "bg-yellow-400" : "bg-red-700"
+            }`}
+          >
+            <Text
+              className={`text-center font-semibold ${
+                searchMode === "browse" ? "text-red-900" : "text-white"
+              }`}
+            >
+              📋 Explorar
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              setSearchMode("search");
+              if (!pokemon && query) fetchPokemon(query);
+            }}
+            className={`flex-1 py-2 rounded-lg ${
+              searchMode === "search" ? "bg-yellow-400" : "bg-red-700"
+            }`}
+          >
+            <Text
+              className={`text-center font-semibold ${
+                searchMode === "search" ? "text-red-900" : "text-white"
+              }`}
+            >
+              🔎 Buscar
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <View className="flex-row items-center mb-4">
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Ej: bulbasaur"
-          className="flex-1 border border-neutral-300 rounded-lg px-3 py-2 mr-2 bg-white"
-          onSubmitEditing={() => fetchPokemon(query)}
-          returnKeyType="search"
-        />
-
-        <TouchableOpacity
-          className="bg-blue-600 px-4 py-2 rounded-lg"
-          onPress={() => fetchPokemon(query)}
-        >
-          <Text className="text-white font-semibold">Buscar</Text>
-        </TouchableOpacity>
-      </View>
-
-      {loading && (
-        <View className="items-center mt-6">
-          <ActivityIndicator size="large" />
-          <Text className="mt-2">Buscando...</Text>
-        </View>
-      )}
-
-      {error && (
-        <View className="mt-4 p-3 bg-red-100 rounded">
-          <Text className="text-red-700">{error}</Text>
-        </View>
-      )}
-
-      {pokemon && (
-        <View className="mt-4 p-4 bg-white rounded-lg shadow">
-          <View className="flex-row items-center">
-            {pokemon.sprites?.front_default ? (
-              <Image
-                source={{ uri: pokemon.sprites.front_default }}
-                className="w-24 h-24 mr-4"
-              />
-            ) : (
-              <View className="w-24 h-24 mr-4 bg-neutral-200 items-center justify-center rounded">
-                <Text>No image</Text>
+      {/* Content Area */}
+      <View className="flex-1 bg-neutral-100">
+        {searchMode === "browse" ? (
+          <FlatList
+            data={displayList}
+            renderItem={({ item }) => <PokemonCard item={item} />}
+            keyExtractor={(item) => item.name}
+            numColumns={2}
+            columnWrapperStyle={{ justifyContent: "space-between", paddingHorizontal: 12 }}
+            contentContainerStyle={{ paddingTop: 12, paddingBottom: 20 }}
+            showsVerticalScrollIndicator={false}
+          />
+        ) : (
+          <View className="flex-1 p-4">
+            {loading && (
+              <View className="items-center mt-20">
+                <ActivityIndicator size="large" color="#ef4444" />
+                <Text className="mt-4 text-neutral-600 text-lg">
+                  Buscando en la Pokédex...
+                </Text>
               </View>
             )}
 
-            <View>
-              <Text className="text-xl font-bold capitalize">
-                {pokemon.name}
-              </Text>
-              <Text className="text-sm text-neutral-500">ID: {pokemon.id}</Text>
-              <View className="flex-row mt-2">
-                {pokemon.types?.map((t, i) => (
-                  <View key={i} className="mr-2 px-2 py-1 bg-neutral-100 rounded">
-                    <Text className="text-sm capitalize">{t.type.name}</Text>
-                  </View>
-                ))}
+            {error && (
+              <View className="mt-8 p-4 bg-red-100 rounded-xl">
+                <Text className="text-red-700 text-center text-lg font-semibold">
+                  ❌ {error}
+                </Text>
+                <Text className="text-red-600 text-center mt-2">
+                  Intenta con otro nombre o número
+                </Text>
               </View>
-            </View>
-          </View>
+            )}
 
-          <View className="mt-4">
-          <Link href={`/details/${pokemon.id}` as any}>
-              <Text className="text-blue-600">Ver detalles</Text>
-            </Link>
+            {pokemon && !loading && (
+              <View className="mt-4">
+                <View className="bg-white rounded-2xl p-6 shadow-lg">
+                  <View className="items-center mb-4">
+                    <Text className="text-sm text-neutral-400 mb-1">
+                      #{pokemon.id.toString().padStart(3, "0")}
+                    </Text>
+                    {pokemon.sprites?.front_default ? (
+                      <Image
+                        source={{ uri: pokemon.sprites.front_default }}
+                        className="w-40 h-40"
+                      />
+                    ) : (
+                      <View className="w-40 h-40 bg-neutral-200 items-center justify-center rounded-xl">
+                        <Text className="text-neutral-400">Sin imagen</Text>
+                      </View>
+                    )}
+                    <Text className="text-3xl font-bold capitalize mt-2">
+                      {pokemon.name}
+                    </Text>
+                  </View>
+
+                  <View className="flex-row justify-center mb-6">
+                    {pokemon.types?.map((t, i) => {
+                      const typeColor = getTypeColor(t.type.name);
+                      return (
+                        <View
+                          key={i}
+                          className={`${typeColor} px-6 py-2 rounded-full mr-2`}
+                        >
+                          <Text className="text-white font-bold capitalize text-base">
+                            {t.type.name}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+
+                  <Link
+                    href={`/details/${pokemon.id}` as any}
+                    asChild
+                  >
+                    <TouchableOpacity className="bg-gradient-to-r bg-red-600 py-4 rounded-xl shadow-md">
+                      <Text className="text-white font-bold text-center text-lg">
+                        Ver Información Completa →
+                      </Text>
+                    </TouchableOpacity>
+                  </Link>
+                </View>
+
+                {/* Quick Stats Preview */}
+                <View className="bg-white rounded-2xl p-4 mt-4 shadow-lg">
+                  <Text className="text-lg font-bold mb-3 text-center">
+                    Vista Rápida
+                  </Text>
+                  <View className="flex-row justify-around">
+                    <View className="items-center">
+                      <Text className="text-3xl">🎯</Text>
+                      <Text className="text-xs text-neutral-500 mt-1">Tipo</Text>
+                      <Text className="font-semibold">
+                        {pokemon.types?.length || 0}
+                      </Text>
+                    </View>
+                    <View className="items-center">
+                      <Text className="text-3xl">📊</Text>
+                      <Text className="text-xs text-neutral-500 mt-1">ID</Text>
+                      <Text className="font-semibold">{pokemon.id}</Text>
+                    </View>
+                    <View className="items-center">
+                      <Text className="text-3xl">⭐</Text>
+                      <Text className="text-xs text-neutral-500 mt-1">Gen</Text>
+                      <Text className="font-semibold">
+                        {pokemon.id <= 151 ? "I" : "II+"}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {!loading && !error && !pokemon && (
+              <View className="items-center mt-20">
+                <Text className="text-6xl mb-4">🔍</Text>
+                <Text className="text-xl font-bold text-neutral-700">
+                  Busca un Pokémon
+                </Text>
+                <Text className="text-neutral-500 mt-2 text-center px-8">
+                  Escribe un nombre o número en el buscador
+                </Text>
+              </View>
+            )}
           </View>
-        </View>
-      )}
+        )}
+      </View>
     </SafeAreaView>
   );
 }

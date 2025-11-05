@@ -13,7 +13,7 @@ import TypeBadge from "../../components/TypeBadge";
 import StatBar from "../../components/StatBar";
 import InfoCard from "../../components/InfoCard";
 import PokeSound from "../../components/PokeSound";
-import FavoriteButton from "../../components/FavoriteButton";
+
 
 type PokemonDetails = {
   id: number;

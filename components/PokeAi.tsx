@@ -357,7 +357,7 @@ Pregunta del usuario: ${currentPrompt}`;
                                           : addFavorite(pokemon)
                                       }
                                       className={`px-3 py-2 rounded-lg mr-2 ${
-                                        fav ? "bg-gray-400" : "bg-red-500"
+                                        fav ? "bg-gray-400" : "bg-black"
                                       }`}
                                     >
                                       <Text className="text-white text-xs font-semibold">
@@ -370,8 +370,8 @@ Pregunta del usuario: ${currentPrompt}`;
                                       asChild
                                     >
                                       <TouchableOpacity className="bg-blue-500 px-3 py-2 rounded-lg">
-                                        <Text className="text-white text-xs font-semibold">
-                                          Ver
+                                        <Text className="text-white text-xs font-semibold"> {/*texto donde se va a ver el detalle general de cada pokemon*/}
+                                          Ver 
                                         </Text>
                                       </TouchableOpacity>
                                     </Link>

@@ -1,22 +1,25 @@
-import React, { useState, useEffect, useRef } from "react";
-import 'react-native-gesture-handler';
+import { GoogleGenAI } from "@google/genai";
+import { Link } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  SafeAreaView,
-  View,
-  Text,
-  TouchableOpacity,
-  Image,
   ActivityIndicator,
   FlatList,
-  ScrollView, // Añadido ScrollView para permitir el desplazamiento
+  Image,
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
-import { Link } from "expo-router";
-import PokemonCard from "../components/PokemonCard";
-import TypeBadge from "../components/TypeBadge";
-import PokedexHeader from "../components/PokedexHeader";
-import SearchBar from "../components/SearchBar";
-import PokeSound from "../components/PokeSound";
+import 'react-native-gesture-handler';
 import FavoriteButton from "../components/FavoriteButton";
+import PokedexHeader from "../components/PokedexHeader";
+import PokemonCard from "../components/PokemonCard";
+import PokeSound from "../components/PokeSound";
+import SearchBar from "../components/SearchBar";
+import TypeBadge from "../components/TypeBadge";
+import PokeAI from "../components/PokeAi";
 
 type Pokemon = {
   id: number;
@@ -31,6 +34,7 @@ type PokemonListItem = {
 };
 
 export default function SearchScreen() {
+  // ---------------------- Estados Pokédex ----------------------
   const [query, setQuery] = useState("");
   const [pokemon, setPokemon] = useState<Pokemon | null>(null);
   const [pokemonList, setPokemonList] = useState<PokemonListItem[]>([]);
@@ -40,6 +44,7 @@ export default function SearchScreen() {
   const [searchMode, setSearchMode] = useState<"search" | "browse">("browse");
   const mountedRef = useRef(true);
 
+  // ---------------------- Cargar lista inicial ----------------------
   useEffect(() => {
     fetchPokemonList();
     return () => {
@@ -94,7 +99,7 @@ export default function SearchScreen() {
           id: data.id,
           name: data.name,
           sprites: {
-            front_default: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${data.id}.gif`
+            front_default: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${data.id}.gif`,
           },
           types: data.types,
         });
@@ -110,13 +115,15 @@ export default function SearchScreen() {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // UI
+  // ---------------------------------------------------------------------------
   return (
     <SafeAreaView className="flex-1 bg-red-600">
-      {/* Header Pokédex Style */}
+      {/* Header Pokédex */}
       <View className="bg-red-600 p-6 pb-4">
         <View className="flex-row justify-between items-start mb-4">
           <PokedexHeader />
-          
           <Link href="/favorites" asChild>
             <TouchableOpacity className="bg-white px-4 py-2 rounded-lg shadow-md">
               <Text className="text-2xl">❤️</Text>
@@ -165,7 +172,7 @@ export default function SearchScreen() {
         </View>
       </View>
 
-      {/* Content Area */}
+      {/* Contenido principal */}
       <View className="flex-1 bg-neutral-100">
         {searchMode === "browse" ? (
           <FlatList
@@ -216,7 +223,7 @@ export default function SearchScreen() {
                       {pokemon.sprites?.front_default ? (
                         <Image
                           source={{
-                            uri: pokemon.sprites.front_default
+                            uri: pokemon.sprites.front_default,
                           }}
                           className="w-40 h-40"
                         />
@@ -236,19 +243,17 @@ export default function SearchScreen() {
                       ))}
                     </View>
 
-                    {/* Botón de sonido */}
                     <View className="mb-4">
                       <PokeSound pokemonId={pokemon.id} pokemonName={pokemon.name} />
                     </View>
 
-                    {/* Botón de favoritos */}
                     <View className="mb-4">
                       <FavoriteButton
                         pokemon={{
                           id: pokemon.id,
                           name: pokemon.name,
                           imageUrl: pokemon.sprites?.front_default || "",
-                          types: pokemon.types?.map(t => t.type.name) || [],
+                          types: pokemon.types?.map((t) => t.type.name) || [],
                         }}
                       />
                     </View>
@@ -262,7 +267,6 @@ export default function SearchScreen() {
                     </Link>
                   </View>
 
-                  {/* Quick Stats Preview */}
                   <View className="bg-white rounded-2xl p-4 mt-4 shadow-lg">
                     <Text className="text-lg font-bold mb-3 text-center">
                       Vista Rápida
@@ -307,6 +311,9 @@ export default function SearchScreen() {
           </ScrollView>
         )}
       </View>
+
+      {/* Botón flotante de PokeAI */}
+      <PokeAI />
     </SafeAreaView>
   );
 }

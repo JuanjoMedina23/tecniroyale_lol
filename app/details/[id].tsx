@@ -262,7 +262,7 @@ export default function DetailsScreen() {
             </View>
             {pokemon.abilities?.some((a) => a.is_hidden) && (
               <Text className="text-xs text-neutral-500 mt-2">
-                🔒 = Habilidad Oculta
+                🔒  Habilidad Oculta
               </Text>
             )}
           </InfoCard>

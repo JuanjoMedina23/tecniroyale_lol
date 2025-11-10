@@ -1,6 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
 import React, { useState } from "react";
-
 import {
   Modal,
   Text,
@@ -13,6 +12,7 @@ import {
   Image,
   ActivityIndicator,
 } from "react-native";
+import { Link } from "expo-router";
 import { useFavorites } from "../context/FavoritesContext";
 
 type Message = {
@@ -36,7 +36,7 @@ export default function PokeAI() {
   const [value, setValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const { favorites } = useFavorites();
+  const { favorites, addFavorite, removeFavorite } = useFavorites();
 
   const APIKEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
   const ai = new GoogleGenAI({ apiKey: APIKEY });
@@ -77,11 +77,15 @@ export default function PokeAI() {
     setIsLoading(true);
 
     try {
-      const favoritesInfo = favorites.length > 0 
-        ? `Pokémon favoritos del usuario: ${favorites.map(f => 
-            `${f.name} (ID: ${f.id}, Tipos: ${f.types.join(", ")})`
-          ).join(", ")}`
-        : "El usuario aún no tiene Pokémon favoritos.";
+      const favoritesInfo =
+        favorites.length > 0
+          ? `Pokémon favoritos del usuario: ${favorites
+              .map(
+                (f) =>
+                  `${f.name} (ID: ${f.id}, Tipos: ${f.types.join(", ")})`
+              )
+              .join(", ")}`
+          : "El usuario aún no tiene Pokémon favoritos.";
 
       const enhancedPrompt = `Eres un asistente experto en Pokémon. ${favoritesInfo}. Total de favoritos: ${favorites.length}.
 
@@ -111,18 +115,14 @@ Pregunta del usuario: ${currentPrompt}`;
 
       if (response.text) {
         let responseText = response.text.trim();
-        
-        // Intentar parsear como JSON
+
         try {
-          // Limpiar el texto para extraer JSON
           const jsonMatch = responseText.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             const jsonData = JSON.parse(jsonMatch[0]);
-            
             if (jsonData.action === "show_pokemon" && Array.isArray(jsonData.pokemon_ids)) {
-              // Fetch Pokémon data
               const pokemonCards = await fetchPokemonData(jsonData.pokemon_ids);
-              
+
               const aiMessage: Message = {
                 id: (Date.now() + 1).toString(),
                 text: jsonData.message || "Aquí están los Pokémon:",
@@ -135,11 +135,8 @@ Pregunta del usuario: ${currentPrompt}`;
               return;
             }
           }
-        } catch (parseError) {
-          // No es JSON, es respuesta normal
-        }
+        } catch (parseError) {}
 
-        // Respuesta normal de texto
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
           text: responseText,
@@ -165,7 +162,7 @@ Pregunta del usuario: ${currentPrompt}`;
     "¿Cuáles son mis favoritos?",
     "Muéstrame 5 Pokémon de tipo agua",
     "Recomiéndame 3 Pokémon legendarios",
-    "Busca los iniciales de Kanto",
+    "Arma un equipo que se complementen con mis favoritos",
   ];
 
   const handleQuickSuggestion = (suggestion: string) => {
@@ -195,6 +192,8 @@ Pregunta del usuario: ${currentPrompt}`;
     };
     return colors[type] || "#68A090";
   };
+
+  const isFavorite = (id: number) => favorites.some((f) => f.id === id);
 
   return (
     <>
@@ -314,39 +313,73 @@ Pregunta del usuario: ${currentPrompt}`;
                       {/* Tarjetas de Pokémon */}
                       {msg.pokemonCards && msg.pokemonCards.length > 0 && (
                         <View className="mt-2 w-full">
-                          {msg.pokemonCards.map((pokemon) => (
-                            <View
-                              key={pokemon.id}
-                              className="bg-white rounded-xl p-3 mb-2 shadow-sm flex-row items-center"
-                            >
-                              <Image
-                                source={{ uri: pokemon.imageUrl }}
-                                className="w-16 h-16"
-                                resizeMode="contain"
-                              />
-                              <View className="flex-1 ml-3">
-                                <Text className="font-bold text-gray-800 capitalize text-base">
-                                  {pokemon.name}
-                                </Text>
-                                <Text className="text-xs text-gray-500 mb-1">
-                                  #{pokemon.id.toString().padStart(3, "0")}
-                                </Text>
-                                <View className="flex-row">
-                                  {pokemon.types.map((type, idx) => (
-                                    <View
-                                      key={idx}
-                                      className="px-2 py-1 rounded-full mr-1"
-                                      style={{ backgroundColor: getTypeColor(type) }}
+                          {msg.pokemonCards.map((pokemon) => {
+                            const fav = isFavorite(pokemon.id);
+                            return (
+                              <View
+                                key={pokemon.id}
+                                className="bg-white rounded-xl p-3 mb-2 shadow-sm flex-row items-center"
+                              >
+                                <Image
+                                  source={{ uri: pokemon.imageUrl }}
+                                  className="w-16 h-16"
+                                  resizeMode="contain"
+                                />
+                                <View className="flex-1 ml-3">
+                                  <Text className="font-bold text-gray-800 capitalize text-base">
+                                    {pokemon.name}
+                                  </Text>
+                                  <Text className="text-xs text-gray-500 mb-1">
+                                    #{pokemon.id.toString().padStart(3, "0")}
+                                  </Text>
+                                  <View className="flex-row flex-wrap mb-2">
+                                    {pokemon.types.map((type, idx) => (
+                                      <View
+                                        key={idx}
+                                        className="px-2 py-1 rounded-full mr-1 mb-1"
+                                        style={{
+                                          backgroundColor: getTypeColor(type),
+                                        }}
+                                      >
+                                        <Text className="text-white text-xs font-semibold capitalize">
+                                          {type}
+                                        </Text>
+                                      </View>
+                                    ))}
+                                  </View>
+
+                                  {/* Botones */}
+                                  <View className="flex-row mt-1">
+                                    <TouchableOpacity
+                                      onPress={() =>
+                                        fav
+                                          ? removeFavorite(pokemon.id)
+                                          : addFavorite(pokemon)
+                                      }
+                                      className={`px-3 py-2 rounded-lg mr-2 ${
+                                        fav ? "bg-gray-400" : "bg-red-500"
+                                      }`}
                                     >
-                                      <Text className="text-white text-xs font-semibold capitalize">
-                                        {type}
+                                      <Text className="text-white text-xs font-semibold">
+                                        {fav ? "💔 Quitar" : "❤️ Añadir"}
                                       </Text>
-                                    </View>
-                                  ))}
+                                    </TouchableOpacity>
+
+                                    <Link
+                                      href={`/details/${pokemon.id}` as any}
+                                      asChild
+                                    >
+                                      <TouchableOpacity className="bg-blue-500 px-3 py-2 rounded-lg">
+                                        <Text className="text-white text-xs font-semibold">
+                                          Ver
+                                        </Text>
+                                      </TouchableOpacity>
+                                    </Link>
+                                  </View>
                                 </View>
                               </View>
-                            </View>
-                          ))}
+                            );
+                          })}
                         </View>
                       )}
 

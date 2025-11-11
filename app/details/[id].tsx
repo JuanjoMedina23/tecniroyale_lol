@@ -7,13 +7,16 @@ import {
   ActivityIndicator,
   ScrollView,
   TouchableOpacity,
+  Modal,
+  TextInput,
+  Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import TypeBadge from "../../components/TypeBadge";
 import StatBar from "../../components/StatBar";
 import InfoCard from "../../components/InfoCard";
 import PokeSound from "../../components/PokeSound";
-
+import { useEquipos } from "@/context/EquipoContext";
 
 type PokemonDetails = {
   id: number;
@@ -46,10 +49,15 @@ type Species = {
 export default function DetailsScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const { teams, addTeam, addPokemonToTeam } = useEquipos();
+  
   const [pokemon, setPokemon] = useState<PokemonDetails | null>(null);
   const [species, setSpecies] = useState<Species | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [teamModalVisible, setTeamModalVisible] = useState(false);
+  const [createTeamModalVisible, setCreateTeamModalVisible] = useState(false);
+  const [newTeamName, setNewTeamName] = useState("");
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -106,6 +114,67 @@ export default function DetailsScreen() {
       }
     }
   }
+
+  const handleAddToTeam = (teamId: string, teamName: string) => {
+    if (!pokemon) return;
+
+    const pokemonData = {
+      id: pokemon.id,
+      name: pokemon.name,
+      imageUrl: pokemon.sprites?.front_default || "",
+      types: pokemon.types?.map(t => t.type.name) || [],
+    };
+
+    const success = addPokemonToTeam(teamId, pokemonData);
+    
+    if (success) {
+      setTeamModalVisible(false);
+      Alert.alert(
+        "¡Agregado!",
+        `${pokemon.name} fue agregado a "${teamName}" 🎉`
+      );
+    } else {
+      Alert.alert(
+        "Error",
+        "No se pudo agregar. El equipo puede estar lleno o el Pokémon ya existe."
+      );
+    }
+  };
+
+  const handleCreateNewTeam = () => {
+    if (!newTeamName.trim()) {
+      Alert.alert("Error", "Debes ingresar un nombre para el equipo");
+      return;
+    }
+
+    if (!pokemon) return;
+
+    const pokemonData = {
+      id: pokemon.id,
+      name: pokemon.name,
+      imageUrl: pokemon.sprites?.front_default || "",
+      types: pokemon.types?.map(t => t.type.name) || [],
+    };
+
+    addTeam(newTeamName.trim(), [pokemonData], "user");
+    setCreateTeamModalVisible(false);
+    setTeamModalVisible(false);
+    setNewTeamName("");
+    Alert.alert(
+      "¡Equipo Creado!",
+      `"${newTeamName}" fue creado con ${pokemon.name} 🎉`
+    );
+  };
+
+  const openTeamModal = () => {
+    if (teams.length === 0) {
+      // Si no hay equipos, abrir directamente el modal de crear equipo
+      setCreateTeamModalVisible(true);
+    } else {
+      // Si hay equipos, mostrar la lista
+      setTeamModalVisible(true);
+    }
+  };
 
   if (loading) {
     return (
@@ -204,6 +273,17 @@ export default function DetailsScreen() {
             {/* Botón de sonido */}
             <PokeSound pokemonId={pokemon.id} pokemonName={pokemon.name} />
           </View>
+
+          {/* Botón Añadir a Equipo */}
+          <TouchableOpacity
+            onPress={openTeamModal}
+            className="bg-purple-600 rounded-2xl p-4 mb-4 shadow-lg flex-row items-center justify-center"
+          >
+            <Text className="text-3xl mr-3">⚔️</Text>
+            <Text className="text-white font-bold text-lg">
+              Añadir a Equipo
+            </Text>
+          </TouchableOpacity>
 
           {/* Descripción */}
           <InfoCard title="Descripción" icon="📖">
@@ -349,6 +429,117 @@ export default function DetailsScreen() {
 
         <View className="h-6" />
       </ScrollView>
+
+      {/* Modal para seleccionar equipo */}
+      <Modal visible={teamModalVisible} animationType="slide" transparent={true}>
+        <View className="flex-1 justify-end bg-black/50">
+          <View className="bg-white rounded-t-3xl p-6 max-h-[80%]">
+            <View className="flex-row justify-between items-center mb-4">
+              <Text className="text-2xl font-bold">Selecciona un Equipo</Text>
+              <TouchableOpacity onPress={() => setTeamModalVisible(false)}>
+                <Text className="text-gray-500 text-2xl">✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView className="mb-4">
+              {teams.map((team) => {
+                const isFull = team.pokemons.length >= 6;
+                const hasPokemon = team.pokemons.some(p => p.id === pokemon.id);
+                const isDisabled = isFull || hasPokemon;
+
+                return (
+                  <TouchableOpacity
+                    key={team.id}
+                    onPress={() => !isDisabled && handleAddToTeam(team.id, team.name)}
+                    disabled={isDisabled}
+                    className={`p-4 rounded-xl mb-3 ${
+                      isDisabled ? "bg-gray-100" : "bg-purple-50"
+                    }`}
+                  >
+                    <View className="flex-row justify-between items-center">
+                      <View className="flex-1">
+                        <Text className={`font-bold text-lg ${
+                          isDisabled ? "text-gray-400" : "text-purple-900"
+                        }`}>
+                          {team.name}
+                        </Text>
+                        <Text className="text-sm text-gray-500 mt-1">
+                          {team.pokemons.length}/6 Pokémon
+                        </Text>
+                      </View>
+                      {hasPokemon ? (
+                        <View className="bg-blue-100 px-3 py-1 rounded-full">
+                          <Text className="text-blue-700 font-semibold text-xs">
+                            ✓ Ya está
+                          </Text>
+                        </View>
+                      ) : isFull ? (
+                        <View className="bg-red-100 px-3 py-1 rounded-full">
+                          <Text className="text-red-700 font-semibold text-xs">
+                            Lleno
+                          </Text>
+                        </View>
+                      ) : (
+                        <Text className="text-purple-600 text-2xl">→</Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <TouchableOpacity
+              onPress={() => {
+                setTeamModalVisible(false);
+                setCreateTeamModalVisible(true);
+              }}
+              className="bg-green-500 rounded-xl py-4"
+            >
+              <Text className="text-white text-center font-bold text-base">
+                ➕ Crear Nuevo Equipo
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal para crear nuevo equipo */}
+      <Modal visible={createTeamModalVisible} animationType="slide" transparent={true}>
+        <View className="flex-1 justify-center bg-black/50 px-6">
+          <View className="bg-white rounded-2xl p-6">
+            <Text className="text-xl font-bold mb-2 text-center">Nuevo Equipo</Text>
+            <Text className="text-sm text-gray-500 mb-4 text-center">
+              Crea un equipo con {pokemon.name}
+            </Text>
+            
+            <TextInput
+              placeholder="Nombre del equipo (ej: Equipo Fuego)"
+              value={newTeamName}
+              onChangeText={setNewTeamName}
+              className="border border-gray-300 rounded-lg px-4 py-3 mb-4"
+              maxLength={30}
+            />
+
+            <TouchableOpacity
+              className="bg-purple-500 rounded-xl py-3 mb-2"
+              onPress={handleCreateNewTeam}
+            >
+              <Text className="text-white text-center font-semibold text-base">
+                ✓ Crear con {pokemon.name}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              className="bg-gray-300 rounded-xl py-3"
+              onPress={() => setCreateTeamModalVisible(false)}
+            >
+              <Text className="text-gray-700 text-center font-semibold text-base">
+                Cancelar
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

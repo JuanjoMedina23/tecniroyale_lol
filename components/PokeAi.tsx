@@ -1,18 +1,19 @@
+import { getTypeColor } from "@/components/ui/CustomColor";
 import { GoogleGenAI } from "@google/genai";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  Image,
-  ActivityIndicator,
 } from "react-native";
-import { Link } from "expo-router";
+import { useEquipos } from "../context/EquipoContext";
 import { useFavorites } from "../context/FavoritesContext";
 
 type Message = {
@@ -35,11 +36,25 @@ export default function PokeAI() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [value, setValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
 
-  const { favorites, addFavorite, removeFavorite } = useFavorites();
+  const { favorites } = useFavorites();
+  const { teams, addTeam } = useEquipos();
 
-  const APIKEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+  // Corregido: Acceder a la API key correctamente
+  const APIKEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY || "";
+  
+  // Verificar si la API key existe
+  if (!APIKEY) {
+    console.error("⚠️ EXPO_PUBLIC_GEMINI_API_KEY no está configurada en el .env");
+  }
+
   const ai = new GoogleGenAI({ apiKey: APIKEY });
+
+  // Auto scroll
+  useEffect(() => {
+    scrollViewRef.current?.scrollToEnd({ animated: true });
+  }, [messages, isLoading]);
 
   const fetchPokemonData = async (pokemonIds: number[]): Promise<PokemonCard[]> => {
     const promises = pokemonIds.map(async (id) => {
@@ -52,7 +67,7 @@ export default function PokeAI() {
           imageUrl: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/${data.id}.gif`,
           types: data.types.map((t: any) => t.type.name),
         };
-      } catch (error) {
+      } catch {
         return null;
       }
     });
@@ -63,6 +78,20 @@ export default function PokeAI() {
 
   const sendMessage = async () => {
     if (!value.trim()) return;
+
+    // Verificar API key antes de enviar
+    if (!APIKEY) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          text: "❌ Error: API key no configurada. Verifica tu archivo .env",
+          sender: "ai",
+          timestamp: new Date(),
+        },
+      ]);
+      return;
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -81,122 +110,126 @@ export default function PokeAI() {
         favorites.length > 0
           ? `Pokémon favoritos del usuario: ${favorites
               .map(
-                (f) =>
-                  `${f.name} (ID: ${f.id}, Tipos: ${f.types.join(", ")})`
+                (f) => `${f.name} (ID: ${f.id}, Tipos: ${f.types.join(", ")})`
               )
               .join(", ")}`
           : "El usuario aún no tiene Pokémon favoritos.";
 
-      const enhancedPrompt = `Eres un asistente experto en Pokémon. ${favoritesInfo}. Total de favoritos: ${favorites.length}.
+      const equiposInfo =
+        teams.length > 0
+          ? `Equipos del usuario: ${teams
+              .map(
+                (t) =>
+                  `${t.name} (${t.pokemons
+                    .map((p) => p.name)
+                    .join(", ")})`
+              )
+              .join("; ")}`
+          : "El usuario aún no tiene equipos Pokémon.";
 
-IMPORTANTE: Si el usuario te pide buscar, mostrar, recomendar o listar Pokémon específicos, debes responder ÚNICAMENTE con un JSON en este formato exacto:
-{"action": "show_pokemon", "pokemon_ids": [1, 2, 3], "message": "Aquí están los Pokémon que buscaste"}
+      const enhancedPrompt = `
+Eres un asistente experto en Pokémon.
+${favoritesInfo}
+${equiposInfo}
+Total de favoritos: ${favorites.length}.
+Total de equipos: ${teams.length}.
 
-Los IDs deben ser números del 1 al 898 (generaciones 1-8).
+IMPORTANTE:
+Si el usuario te pide buscar, mostrar, recomendar o listar Pokémon específicos,
+responde ÚNICAMENTE con un JSON:
+{"action": "show_pokemon", "pokemon_ids": [1,2,3], "message": "Aquí están los Pokémon que buscaste"}
 
-Ejemplos:
-- "muéstrame 5 Pokémon de tipo fuego" → {"action": "show_pokemon", "pokemon_ids": [4, 5, 6, 37, 58], "message": "Aquí tienes 5 Pokémon de tipo fuego"}
-- "recomiéndame 3 Pokémon legendarios" → {"action": "show_pokemon", "pokemon_ids": [150, 144, 145], "message": "Te recomiendo estos 3 Pokémon legendarios"}
-- "busca Pokémon iniciales" → {"action": "show_pokemon", "pokemon_ids": [1, 4, 7], "message": "Los Pokémon iniciales de Kanto"}
-
-Para cualquier otra pregunta, responde normalmente de forma conversacional.
+Si el usuario te pide crear, mostrar o recomendar un EQUIPO Pokémon,
+responde con un JSON:
+{"action": "show_team", "team_name": "Equipo Fuego", "pokemon_ids": [4,5,6], "message": "Aquí tienes tu equipo de fuego"}
 
 Pregunta del usuario: ${currentPrompt}`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: enhancedPrompt }],
-          },
-        ],
+        model: "gemini-2.0-flash-exp",
+        contents: [{ role: "user", parts: [{ text: enhancedPrompt }] }],
       });
 
       if (response.text) {
-        let responseText = response.text.trim();
-
+        let text = response.text.trim();
         try {
-          const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             const jsonData = JSON.parse(jsonMatch[0]);
+
+            // Mostrar Pokémon individuales
             if (jsonData.action === "show_pokemon" && Array.isArray(jsonData.pokemon_ids)) {
               const pokemonCards = await fetchPokemonData(jsonData.pokemon_ids);
-
               const aiMessage: Message = {
                 id: (Date.now() + 1).toString(),
                 text: jsonData.message || "Aquí están los Pokémon:",
                 sender: "ai",
                 timestamp: new Date(),
-                pokemonCards: pokemonCards,
+                pokemonCards,
+              };
+              setMessages((prev) => [...prev, aiMessage]);
+              setIsLoading(false);
+              return;
+            }
+
+            // Crear equipo Pokémon
+            if (jsonData.action === "show_team" && Array.isArray(jsonData.pokemon_ids)) {
+              const pokemonCards = await fetchPokemonData(jsonData.pokemon_ids);
+              const teamName = jsonData.team_name || `Equipo ${Date.now()}`;
+              addTeam(teamName, pokemonCards, "ai");
+
+              const aiMessage: Message = {
+                id: (Date.now() + 1).toString(),
+                text:
+                  (jsonData.message || "Aquí está tu equipo:") +
+                  `\n\n✅ Equipo "${teamName}" guardado exitosamente.`,
+                sender: "ai",
+                timestamp: new Date(),
+                pokemonCards,
               };
               setMessages((prev) => [...prev, aiMessage]);
               setIsLoading(false);
               return;
             }
           }
-        } catch (parseError) {}
+        } catch (err) {
+          console.log("No JSON encontrado, mostrando texto normal");
+        }
 
-        const aiMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          text: responseText,
-          sender: "ai",
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, aiMessage]);
+        // Respuesta normal
+        setMessages((prev) => [
+          ...prev,
+          { id: (Date.now() + 1).toString(), text, sender: "ai", timestamp: new Date() },
+        ]);
       }
     } catch (error: any) {
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: "❌ Error: " + (error.message || "No pude procesar tu mensaje"),
-        sender: "ai",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      console.error("Error completo:", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          text: `❌ Error: ${error.message || "No pude procesar tu mensaje"}. Verifica tu API key.`,
+          sender: "ai",
+          timestamp: new Date(),
+        },
+      ]);
     } finally {
       setIsLoading(false);
     }
   };
 
   const quickSuggestions = [
-    "¿Cuáles son mis favoritos?",
     "Muéstrame 5 Pokémon de tipo agua",
-    "Recomiéndame 3 Pokémon legendarios",
-    "Arma un equipo que se complementen con mis favoritos",
+    "Crea un equipo con 6 Pokémon fuego",
+    "Recomiéndame un equipo legendario",
+    "Busca los iniciales de Kanto",
   ];
 
-  const handleQuickSuggestion = (suggestion: string) => {
-    setValue(suggestion);
-  };
-
-  const getTypeColor = (type: string): string => {
-    const colors: { [key: string]: string } = {
-      normal: "#A8A878",
-      fire: "#F08030",
-      water: "#6890F0",
-      electric: "#F8D030",
-      grass: "#78C850",
-      ice: "#98D8D8",
-      fighting: "#C03028",
-      poison: "#A040A0",
-      ground: "#E0C068",
-      flying: "#A890F0",
-      psychic: "#F85888",
-      bug: "#A8B820",
-      rock: "#B8A038",
-      ghost: "#705898",
-      dragon: "#7038F8",
-      dark: "#705848",
-      steel: "#B8B8D0",
-      fairy: "#EE99AC",
-    };
-    return colors[type] || "#68A090";
-  };
-
-  const isFavorite = (id: number) => favorites.some((f) => f.id === id);
+  const handleQuickSuggestion = (suggestion: string) => setValue(suggestion);
 
   return (
     <>
+      {/* Botón flotante */}
       <TouchableOpacity
         onPress={() => setIsOpen(true)}
         className="absolute bottom-6 right-6 w-16 h-16 bg-blue-600 rounded-full items-center justify-center shadow-2xl z-50"
@@ -211,34 +244,29 @@ Pregunta del usuario: ${currentPrompt}`;
         <Text className="text-3xl">😎</Text>
         {favorites.length > 0 && (
           <View className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full items-center justify-center">
-            <Text className="text-white text-xs font-bold">
-              {favorites.length}
-            </Text>
+            <Text className="text-white text-xs font-bold">{favorites.length}</Text>
           </View>
         )}
       </TouchableOpacity>
 
-      <Modal
-        visible={isOpen}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setIsOpen(false)}
-      >
+      {/* Modal principal */}
+      <Modal visible={isOpen} animationType="slide" transparent onRequestClose={() => setIsOpen(false)}>
         <View className="flex-1 bg-black/50">
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             className="flex-1 justify-end"
           >
             <View className="bg-white rounded-t-3xl h-[85%] shadow-2xl">
+              {/* Header */}
               <View className="bg-blue-600 rounded-t-3xl p-4 flex-row items-center justify-between">
                 <View className="flex-row items-center">
                   <View className="w-10 h-10 bg-white rounded-full items-center justify-center mr-3">
-                    <Text className="text-2xl">😁</Text>
+                    <Text className="text-2xl">🤖</Text>
                   </View>
                   <View>
                     <Text className="text-white font-bold text-lg">PokeAI</Text>
                     <Text className="text-blue-200 text-xs">
-                      {isLoading ? "Buscando..." : `${favorites.length} favoritos`}
+                      {isLoading ? "Pensando..." : `${favorites.length} favoritos | ${teams.length} equipos`}
                     </Text>
                   </View>
                 </View>
@@ -250,31 +278,29 @@ Pregunta del usuario: ${currentPrompt}`;
                 </TouchableOpacity>
               </View>
 
+              {/* Mensajes */}
               <ScrollView
+                ref={scrollViewRef}
                 className="flex-1 p-4 bg-gray-50"
                 contentContainerStyle={{ paddingBottom: 20 }}
               >
                 {messages.length === 0 ? (
                   <View className="flex-1 py-10">
                     <View className="items-center mb-6">
-                      <Text className="text-6xl mb-4">😾</Text>
-                      <Text className="text-xl font-bold text-gray-700 mb-2">
-                        ¡Hola! Soy PokeAI
-                      </Text>
+                      <Text className="text-6xl mb-4">🤖</Text>
+                      <Text className="text-xl font-bold text-gray-700 mb-2">¡Hola! Soy PokeAI</Text>
                       <Text className="text-gray-500 text-center px-8 mb-4">
-                        Puedo buscar y mostrarte Pokémon
+                        Puedo buscar Pokémon, recomendarte equipos o crear los tuyos 🔥
                       </Text>
                       <View className="bg-blue-50 p-3 rounded-lg">
                         <Text className="text-blue-800 text-sm font-semibold text-center">
-                          📊 Tienes {favorites.length} favoritos
+                          ⭐ {favorites.length} favoritos | 🧩 {teams.length} equipos
                         </Text>
                       </View>
                     </View>
 
                     <View className="px-4">
-                      <Text className="text-sm text-gray-500 mb-2 font-semibold">
-                        💡 Prueba preguntarme:
-                      </Text>
+                      <Text className="text-sm text-gray-500 mb-2 font-semibold">💡 Prueba preguntarme:</Text>
                       {quickSuggestions.map((suggestion, index) => (
                         <TouchableOpacity
                           key={index}
@@ -288,12 +314,7 @@ Pregunta del usuario: ${currentPrompt}`;
                   </View>
                 ) : (
                   messages.map((msg) => (
-                    <View
-                      key={msg.id}
-                      className={`mb-3 ${
-                        msg.sender === "user" ? "items-end" : "items-start"
-                      }`}
-                    >
+                    <View key={msg.id} className={`mb-3 ${msg.sender === "user" ? "items-end" : "items-start"}`}>
                       <View
                         className={`max-w-[80%] p-3 rounded-2xl ${
                           msg.sender === "user"
@@ -310,85 +331,44 @@ Pregunta del usuario: ${currentPrompt}`;
                         </Text>
                       </View>
 
-                      {/* Tarjetas de Pokémon */}
+                      {/* Mostrar Pokémon */}
                       {msg.pokemonCards && msg.pokemonCards.length > 0 && (
                         <View className="mt-2 w-full">
-                          {msg.pokemonCards.map((pokemon) => {
-                            const fav = isFavorite(pokemon.id);
-                            return (
-                              <View
-                                key={pokemon.id}
-                                className="bg-white rounded-xl p-3 mb-2 shadow-sm flex-row items-center"
-                              >
-                                <Image
-                                  source={{ uri: pokemon.imageUrl }}
-                                  className="w-16 h-16"
-                                  resizeMode="contain"
-                                />
-                                <View className="flex-1 ml-3">
-                                  <Text className="font-bold text-gray-800 capitalize text-base">
-                                    {pokemon.name}
-                                  </Text>
-                                  <Text className="text-xs text-gray-500 mb-1">
-                                    #{pokemon.id.toString().padStart(3, "0")}
-                                  </Text>
-                                  <View className="flex-row flex-wrap mb-2">
-                                    {pokemon.types.map((type, idx) => (
-                                      <View
-                                        key={idx}
-                                        className="px-2 py-1 rounded-full mr-1 mb-1"
-                                        style={{
-                                          backgroundColor: getTypeColor(type),
-                                        }}
-                                      >
-                                        <Text className="text-white text-xs font-semibold capitalize">
-                                          {type}
-                                        </Text>
-                                      </View>
-                                    ))}
-                                  </View>
-
-                                  {/* Botones */}
-                                  <View className="flex-row mt-1">
-                                    <TouchableOpacity
-                                      onPress={() =>
-                                        fav
-                                          ? removeFavorite(pokemon.id)
-                                          : addFavorite(pokemon)
-                                      }
-                                      className={`px-3 py-2 rounded-lg mr-2 ${
-                                        fav ? "bg-gray-400" : "bg-black"
-                                      }`}
+                          {msg.pokemonCards.map((pokemon) => (
+                            <View
+                              key={pokemon.id}
+                              className="bg-white rounded-xl p-3 mb-2 shadow-sm flex-row items-center"
+                            >
+                              <Image
+                                source={{ uri: pokemon.imageUrl }}
+                                className="w-16 h-16"
+                                resizeMode="contain"
+                              />
+                              <View className="flex-1 ml-3">
+                                <Text className="font-bold text-gray-800 capitalize text-base">
+                                  {pokemon.name}
+                                </Text>
+                                <Text className="text-xs text-gray-500 mb-1">
+                                  #{pokemon.id.toString().padStart(3, "0")}
+                                </Text>
+                                <View className="flex-row flex-wrap">
+                                  {pokemon.types.map((type, idx) => (
+                                    <View
+                                      key={idx}
+                                      className="px-2 py-1 rounded-full mr-1 mb-1"
+                                      style={{ backgroundColor: getTypeColor(type) }}
                                     >
-                                      <Text className="text-white text-xs font-semibold">
-                                        {fav ? "💔 Quitar" : "❤️ Añadir"}
+                                      <Text className="text-white text-xs font-semibold capitalize">
+                                        {type}
                                       </Text>
-                                    </TouchableOpacity>
-
-                                    <Link
-                                      href={`/details/${pokemon.id}` as any}
-                                      asChild
-                                    >
-                                      <TouchableOpacity className="bg-blue-500 px-3 py-2 rounded-lg">
-                                        <Text className="text-white text-xs font-semibold"> {/*texto donde se va a ver el detalle general de cada pokemon*/}
-                                          Ver 
-                                        </Text>
-                                      </TouchableOpacity>
-                                    </Link>
-                                  </View>
+                                    </View>
+                                  ))}
                                 </View>
                               </View>
-                            );
-                          })}
+                            </View>
+                          ))}
                         </View>
                       )}
-
-                      <Text className="text-xs text-gray-400 mt-1 mx-2">
-                        {msg.timestamp.toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </Text>
                     </View>
                   ))
                 )}
@@ -402,11 +382,12 @@ Pregunta del usuario: ${currentPrompt}`;
                 )}
               </ScrollView>
 
+              {/* Input */}
               <View className="border-t border-gray-200 p-4 bg-white">
                 <View className="flex-row items-end">
                   <View className="flex-1 bg-gray-100 rounded-3xl px-4 py-2 mr-2 min-h-[44px] justify-center">
                     <TextInput
-                      placeholder="Ej: muéstrame 5 Pokémon de fuego..."
+                      placeholder="Ej: crea un equipo con 6 Pokémon fuego..."
                       placeholderTextColor="#9CA3AF"
                       value={value}
                       onChangeText={setValue}
@@ -414,6 +395,7 @@ Pregunta del usuario: ${currentPrompt}`;
                       maxLength={500}
                       style={{ maxHeight: 100 }}
                       onSubmitEditing={sendMessage}
+                      editable={!isLoading}
                     />
                   </View>
 

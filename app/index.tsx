@@ -10,7 +10,8 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  Modal
 } from "react-native";
 import 'react-native-gesture-handler';
 import FavoriteButton from "../components/FavoriteButton";
@@ -20,6 +21,8 @@ import PokeSound from "../components/PokeSound";
 import SearchBar from "../components/SearchBar";
 import TypeBadge from "../components/TypeBadge";
 import PokeAI from "../components/PokeAi";
+import PokeEquipo from "../components/PokeEquipo";
+import { useEquipos } from "../context/EquipoContext";
 
 type Pokemon = {
   id: number;
@@ -42,7 +45,11 @@ export default function SearchScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchMode, setSearchMode] = useState<"search" | "browse">("browse");
+  const [showEquipos, setShowEquipos] = useState(false);
   const mountedRef = useRef(true);
+
+  // ---------------------- Context de Equipos ----------------------
+  const { teams } = useEquipos();
 
   // ---------------------- Cargar lista inicial ----------------------
   useEffect(() => {
@@ -124,11 +131,29 @@ export default function SearchScreen() {
       <View className="bg-red-600 p-6 pb-4">
         <View className="flex-row justify-between items-start mb-4">
           <PokedexHeader />
-          <Link href="/favorites" asChild>
-            <TouchableOpacity className="bg-white px-4 py-2 rounded-lg shadow-md">
-              <Text className="text-2xl">❤️</Text>
+          <View className="flex-row space-x-2">
+            {/* Botón de Equipos (abre modal) */}
+            <TouchableOpacity 
+              onPress={() => setShowEquipos(true)}
+              className="bg-white px-4 py-2 rounded-lg shadow-md relative"
+            >
+              <Text className="text-2xl">⚔️</Text>
+              {teams.length > 0 && (
+                <View className="absolute -top-1 -right-1 bg-purple-600 rounded-full w-5 h-5 items-center justify-center">
+                  <Text className="text-white text-xs font-bold">
+                    {teams.length}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
-          </Link>
+
+            {/* Botón de Favoritos */}
+            <Link href="/favorites" asChild>
+              <TouchableOpacity className="bg-white px-4 py-2 rounded-lg shadow-md">
+                <Text className="text-2xl">❤️</Text>
+              </TouchableOpacity>
+            </Link>
+          </View>
         </View>
 
         <SearchBar
@@ -314,6 +339,12 @@ export default function SearchScreen() {
 
       {/* Botón flotante de PokeAI */}
       <PokeAI />
+
+      {/* Modal de Equipos */}
+      <PokeEquipo 
+        isOpen={showEquipos} 
+        onClose={() => setShowEquipos(false)} 
+      />
     </SafeAreaView>
   );
 }

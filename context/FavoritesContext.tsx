@@ -16,23 +16,21 @@ type FavoritesContextType = {
   toggleFavorite: (pokemon: FavoritePokemon) => void;
 };
 
-const FavoritesContext = createContext<FavoritesContextType | undefined>(
-  undefined
-);
-
+const FavoritesContext = createContext<FavoritesContextType | undefined>(undefined);
 const STORAGE_KEY = "@pokedex_favorites";
 
 export function FavoritesProvider({ children }: { children: React.ReactNode }) {
   const [favorites, setFavorites] = useState<FavoritePokemon[]>([]);
+  const [loaded, setLoaded] = useState(false); // <- bandera para evitar sobreescritura
 
-  // Cargar favoritos al iniciar
   useEffect(() => {
     loadFavorites();
   }, []);
 
-  // Guardar favoritos cuando cambien
   useEffect(() => {
-    saveFavorites();
+    if (loaded) {
+      saveFavorites();
+    }
   }, [favorites]);
 
   async function loadFavorites() {
@@ -43,6 +41,8 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.error("Error loading favorites:", error);
+    } finally {
+      setLoaded(true); // <- marcamos que ya cargó
     }
   }
 
@@ -56,10 +56,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
 
   function addFavorite(pokemon: FavoritePokemon) {
     setFavorites((prev) => {
-      // Evitar duplicados
-      if (prev.some((fav) => fav.id === pokemon.id)) {
-        return prev;
-      }
+      if (prev.some((fav) => fav.id === pokemon.id)) return prev;
       return [...prev, pokemon];
     });
   }
@@ -68,7 +65,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     setFavorites((prev) => prev.filter((fav) => fav.id !== id));
   }
 
-  function isFavorite(id: number): boolean {
+  function isFavorite(id: number) {
     return favorites.some((fav) => fav.id === id);
   }
 

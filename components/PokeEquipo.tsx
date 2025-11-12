@@ -28,12 +28,16 @@ type PokeEquipoProps = {
 };
 
 export default function PokeEquipo({ isOpen, onClose }: PokeEquipoProps) {
-  const { teams, addTeam, removeTeam, clearTeams, removePokemonFromTeam } = useEquipos();
+  const { teams, addTeam, removeTeam, clearTeams, removePokemonFromTeam, renameTeam } = useEquipos();
   const { addFavorite } = useFavorites();
 
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [teamName, setTeamName] = useState("");
   const [menuVisible, setMenuVisible] = useState<string | null>(null);
+  const [renameModalVisible, setRenameModalVisible] = useState(false);
+  const [renameTeamId, setRenameTeamId] = useState<string>("");
+  const [newTeamName, setNewTeamName] = useState("");
+  const [collapsedTeams, setCollapsedTeams] = useState<Set<string>>(new Set());
 
   const openCreateModal = () => {
     setTeamName("");
@@ -55,18 +59,20 @@ export default function PokeEquipo({ isOpen, onClose }: PokeEquipoProps) {
 
   const handleDeleteTeam = (id: string, name: string) => {
     setMenuVisible(null);
-    Alert.alert(
-      "Eliminar Equipo",
-      `¿Estás seguro de eliminar "${name}"?`,
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Eliminar",
-          style: "destructive",
-          onPress: () => removeTeam(id),
-        },
-      ]
-    );
+    setTimeout(() => {
+      Alert.alert(
+        "Eliminar Equipo",
+        `¿Estás seguro de eliminar "${name}"?`,
+        [
+          { text: "Cancelar", style: "cancel" },
+          {
+            text: "Eliminar",
+            style: "destructive",
+            onPress: () => removeTeam(id),
+          },
+        ]
+      );
+    }, 100);
   };
 
   const handleRemovePokemon = (teamId: string, pokemonId: number, pokemonName: string) => {
@@ -119,6 +125,41 @@ export default function PokeEquipo({ isOpen, onClose }: PokeEquipoProps) {
     setMenuVisible(menuVisible === teamId ? null : teamId);
   };
 
+  const closeMenu = () => {
+    setMenuVisible(null);
+  };
+
+  const handleRenameTeam = (id: string, currentName: string) => {
+    setMenuVisible(null);
+    setRenameTeamId(id);
+    setNewTeamName(currentName);
+    setRenameModalVisible(true);
+  };
+
+  const saveRename = () => {
+    if (!newTeamName.trim()) {
+      Alert.alert("Error", "El nombre no puede estar vacío");
+      return;
+    }
+    
+    renameTeam(renameTeamId, newTeamName.trim());
+    setRenameModalVisible(false);
+    Alert.alert("✓ Renombrado", `Equipo renombrado exitosamente`);
+  };
+
+  const toggleTeamCollapse = (teamId: string) => {
+    setMenuVisible(null);
+    setCollapsedTeams((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(teamId)) {
+        newSet.delete(teamId);
+      } else {
+        newSet.add(teamId);
+      }
+      return newSet;
+    });
+  };
+
   // Calcular estadísticas del equipo
   const getTeamStats = (pokemons: Pokemon[]) => {
     if (pokemons.length === 0) {
@@ -134,17 +175,8 @@ export default function PokeEquipo({ isOpen, onClose }: PokeEquipoProps) {
   return (
     <Modal visible={isOpen} animationType="slide" transparent={false}>
       <SafeAreaView className="flex-1 bg-purple-600">
-        {/* Overlay para cerrar menú al tocar fuera */}
-        {menuVisible && (
-          <TouchableOpacity
-            onPress={() => setMenuVisible(null)}
-            className="absolute inset-0 z-40"
-            activeOpacity={1}
-          />
-        )}
-
         {/* Header */}
-        <View className="bg-purple-600 p-6 pb-4">
+        <View className="bg-purple-600 p-6 pb-4" style={{ zIndex: 1 }}>
           <View className="flex-row justify-between items-center mb-4">
             <View>
               <Text className="text-white text-3xl font-bold">⚔️ Mis Equipos</Text>
@@ -182,7 +214,7 @@ export default function PokeEquipo({ isOpen, onClose }: PokeEquipoProps) {
         </View>
 
         {/* Contenido */}
-        <View className="flex-1 bg-neutral-100">
+        <View className="flex-1 bg-neutral-100" style={{ zIndex: 0 }}>
           {teams.length === 0 ? (
             <View className="flex-1 items-center justify-center p-8">
               <Text className="text-6xl mb-4">📦</Text>
@@ -205,11 +237,13 @@ export default function PokeEquipo({ isOpen, onClose }: PokeEquipoProps) {
                 const stats = getTeamStats(team.pokemons);
                 const isFull = team.pokemons.length >= 6;
                 const isMenuOpen = menuVisible === team.id;
+                const isCollapsed = collapsedTeams.has(team.id);
                 
                 return (
                   <View
                     key={team.id}
                     className="bg-white rounded-2xl p-4 mb-4 shadow-lg"
+                    style={{ overflow: 'visible' }}
                   >
                     {/* Header del equipo */}
                     <View className="flex-row justify-between items-start mb-3">
@@ -256,34 +290,11 @@ export default function PokeEquipo({ isOpen, onClose }: PokeEquipoProps) {
                         >
                           <Text className="text-neutral-600 text-lg font-bold">⋮</Text>
                         </TouchableOpacity>
-
-                        {/* Menú desplegable */}
-                        {isMenuOpen && (
-                          <View className="absolute right-0 top-10 bg-white rounded-lg shadow-xl border border-gray-200 z-50 elevation-5" style={{ minWidth: 150 }}>
-                            <TouchableOpacity
-                              onPress={() => handleDeleteTeam(team.id, team.name)}
-                              className="flex-row items-center px-4 py-3 border-b border-gray-100"
-                              activeOpacity={0.7}
-                            >
-                              <Text className="text-red-600 mr-2">🗑️</Text>
-                              <Text className="text-red-600 font-semibold">Eliminar</Text>
-                            </TouchableOpacity>
-                            
-                            <TouchableOpacity
-                              onPress={() => setMenuVisible(null)}
-                              className="flex-row items-center px-4 py-3"
-                              activeOpacity={0.7}
-                            >
-                              <Text className="text-gray-600 mr-2">✕</Text>
-                              <Text className="text-gray-600">Cerrar</Text>
-                            </TouchableOpacity>
-                          </View>
-                        )}
                       </View>
                     </View>
 
                     {/* Mensaje si está vacío */}
-                    {team.pokemons.length === 0 ? (
+                    {!isCollapsed && team.pokemons.length === 0 ? (
                       <View className="bg-purple-50 rounded-xl p-6 items-center">
                         <Text className="text-4xl mb-2">🎯</Text>
                         <Text className="text-neutral-600 font-semibold mb-1">
@@ -293,7 +304,7 @@ export default function PokeEquipo({ isOpen, onClose }: PokeEquipoProps) {
                           Ve a los detalles de un Pokémon y agrégalo aquí
                         </Text>
                       </View>
-                    ) : (
+                    ) : !isCollapsed && team.pokemons.length > 0 ? (
                       <>
                         {/* Grid de Pokémon */}
                         <View className="flex-row flex-wrap" style={{ gap: 8 }}>
@@ -403,6 +414,15 @@ export default function PokeEquipo({ isOpen, onClose }: PokeEquipoProps) {
                           </View>
                         </View>
                       </>
+                    ) : null}
+
+                    {/* Indicador de equipo colapsado */}
+                    {isCollapsed && team.pokemons.length > 0 && (
+                      <View className="bg-neutral-50 rounded-xl p-4 items-center">
+                        <Text className="text-neutral-500 text-sm">
+                          👁️ Equipo oculto ({team.pokemons.length} Pokémon)
+                        </Text>
+                      </View>
                     )}
                   </View>
                 );
@@ -410,6 +430,109 @@ export default function PokeEquipo({ isOpen, onClose }: PokeEquipoProps) {
             </ScrollView>
           )}
         </View>
+
+        {/* Modal de menú flotante */}
+        <Modal
+          visible={menuVisible !== null}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={closeMenu}
+        >
+          <TouchableOpacity
+            style={{
+              flex: 1,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+            activeOpacity={1}
+            onPress={closeMenu}
+          >
+            <View
+              style={{
+                backgroundColor: 'white',
+                borderRadius: 16,
+                padding: 0,
+                minWidth: 200,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.25,
+                shadowRadius: 3.84,
+                elevation: 5,
+              }}
+            >
+              {menuVisible && (
+                <>
+                  <TouchableOpacity
+                    onPress={() => {
+                      const team = teams.find(t => t.id === menuVisible);
+                      if (team) {
+                        handleRenameTeam(team.id, team.name);
+                      }
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      padding: 16,
+                      borderBottomWidth: 1,
+                      borderBottomColor: '#f3f4f6',
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={{ fontSize: 20, marginRight: 12 }}>✏️</Text>
+                    <Text style={{ color: '#2563eb', fontWeight: '600', fontSize: 16 }}>
+                      Renombrar
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      const team = teams.find(t => t.id === menuVisible);
+                      if (team) {
+                        toggleTeamCollapse(team.id);
+                      }
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      padding: 16,
+                      borderBottomWidth: 1,
+                      borderBottomColor: '#f3f4f6',
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={{ fontSize: 20, marginRight: 12 }}>
+                      {collapsedTeams.has(menuVisible) ? '👁️' : '🙈'}
+                    </Text>
+                    <Text style={{ color: '#6b7280', fontWeight: '600', fontSize: 16 }}>
+                      {collapsedTeams.has(menuVisible) ? 'Mostrar' : 'Ocultar'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      const team = teams.find(t => t.id === menuVisible);
+                      if (team) {
+                        handleDeleteTeam(team.id, team.name);
+                      }
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      padding: 16,
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={{ fontSize: 20, marginRight: 12 }}>🗑️</Text>
+                    <Text style={{ color: '#dc2626', fontWeight: '600', fontSize: 16 }}>
+                      Eliminar
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </TouchableOpacity>
+        </Modal>
       </SafeAreaView>
 
       {/* Modal para crear equipo vacío */}
@@ -445,6 +568,45 @@ export default function PokeEquipo({ isOpen, onClose }: PokeEquipoProps) {
             <TouchableOpacity
               className="bg-gray-300 rounded-xl py-3"
               onPress={() => setCreateModalVisible(false)}
+            >
+              <Text className="text-gray-700 text-center font-semibold text-base">
+                Cancelar
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal para renombrar equipo */}
+      <Modal visible={renameModalVisible} animationType="slide" transparent={true}>
+        <View className="flex-1 justify-center bg-black/50 px-6">
+          <View className="bg-white rounded-2xl p-6">
+            <Text className="text-xl font-bold mb-2 text-center">✏️ Renombrar Equipo</Text>
+            <Text className="text-sm text-gray-500 mb-4 text-center">
+              Ingresa el nuevo nombre para el equipo
+            </Text>
+            
+            <TextInput
+              placeholder="Nuevo nombre del equipo"
+              value={newTeamName}
+              onChangeText={setNewTeamName}
+              className="border border-gray-300 rounded-lg px-4 py-3 mb-4"
+              maxLength={30}
+              autoFocus
+            />
+
+            <TouchableOpacity
+              className="bg-blue-500 rounded-xl py-3 mb-2"
+              onPress={saveRename}
+            >
+              <Text className="text-white text-center font-semibold text-base">
+                ✓ Guardar Cambios
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              className="bg-gray-300 rounded-xl py-3"
+              onPress={() => setRenameModalVisible(false)}
             >
               <Text className="text-gray-700 text-center font-semibold text-base">
                 Cancelar

@@ -22,6 +22,7 @@ type EquipoContextType = {
   clearTeams: () => void;
   addPokemonToTeam: (teamId: string, pokemon: Pokemon) => boolean;
   removePokemonFromTeam: (teamId: string, pokemonId: number) => boolean;
+  renameTeam: (teamId: string, newName: string) => boolean;
 };
 
 const EquipoContext = createContext<EquipoContextType | undefined>(undefined);
@@ -135,6 +136,34 @@ export const EquipoProvider = ({ children }: { children: React.ReactNode }) => {
     return success;
   };
 
+  const renameTeam = (teamId: string, newName: string): boolean => {
+    let success = false;
+
+    setTeams((prev) => {
+      const teamIndex = prev.findIndex((t) => t.id === teamId);
+      
+      if (teamIndex === -1) {
+        // Equipo no encontrado
+        return prev;
+      }
+
+      // Renombrar equipo
+      const updatedTeam = {
+        ...prev[teamIndex],
+        name: newName,
+      };
+
+      success = true;
+      return [
+        ...prev.slice(0, teamIndex),
+        updatedTeam,
+        ...prev.slice(teamIndex + 1),
+      ];
+    });
+
+    return success;
+  };
+
   return (
     <EquipoContext.Provider 
       value={{ 
@@ -143,7 +172,8 @@ export const EquipoProvider = ({ children }: { children: React.ReactNode }) => {
         removeTeam, 
         clearTeams, 
         addPokemonToTeam,
-        removePokemonFromTeam 
+        removePokemonFromTeam,
+        renameTeam
       }}
     >
       {children}
